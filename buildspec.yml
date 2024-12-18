@@ -1,0 +1,39 @@
+version: 0.2
+
+phases:
+  install:
+    runtime-versions:
+      python: 3.9
+    commands:
+      - pip install --upgrade pip
+      - pip install pytest pytest-cov
+
+  pre_build:
+    commands:
+      - echo "Verificando versiones..."
+      - sam --version
+      - python3 --version
+      - pip3 --version
+      - export PYTHONPATH=$PYTHONPATH:$CODEBUILD_SRC_DIR
+      - pytest tests/unit/ --cov=hello_world --cov-report=xml --cov-report=term-missing
+
+  build:
+    commands:
+      - sam build
+      # Configurar el prefijo del bucket S3 usando CODEBUILD_BUILD_ID o CODEPIPELINE_EXECUTION_ID
+      - sam package --output-template-file packaged.yaml --s3-bucket lambdasrepositoryfromcodepipeline
+
+  post_build:
+    commands:
+      - sam deploy --template-file packaged.yaml --stack-name gps-talent-project --s3-bucket lambdasrepositoryfromcodepipeline --capabilities CAPABILITY_NAMED_IAM --region us-east-1 --no-confirm-changeset --force-upload
+      - echo "Despliegue completado. Archivos generados:"
+      - ls -la
+      - cat packaged.yaml
+
+artifacts:
+  files:
+    - packaged.yaml
+    - .aws-sam/**/*
+    - htmlcov/** # Reporte HTML de cobertura
+    - lcov.info # Reporte LCOV para SonarQube
+  discard-paths: no
